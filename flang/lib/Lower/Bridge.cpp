@@ -1289,8 +1289,11 @@ private:
                           sym, value.getAddr(), value.getLen(),
                           value.getExtents(), value.getLBounds());
                   },
-                  [&](const fir::BoxValue &) {
-                    TODO(toLocation(), "association selector of derived type");
+                  [&](const fir::BoxValue &value) {
+                    localSymbols.addBoxSymbol(sym, value.getAddr(),
+                                              value.getLBounds(),
+                                              value.getExplicitParameters(),
+                                              value.getExplicitExtents());
                   },
                   [&](const auto &) {
                     mlir::emitError(toLocation(),
@@ -2445,13 +2448,13 @@ private:
   // Lower Variables specification expressions and attributes
   //===--------------------------------------------------------------===//
 
-  /// Helper to decide if a dummy argument must be tracked in an IrBox.
-  static bool lowerToIrBox(const Fortran::semantics::Symbol &sym,
-                           mlir::Value dummyArg) {
-    // Only dummy arguments coming as fir.box can be tracked in an IrBox.
+  /// Helper to decide if a dummy argument must be tracked in an fir::BoxValue.
+  static bool lowerToBoxValue(const Fortran::semantics::Symbol &sym,
+                              mlir::Value dummyArg) {
+    // Only dummy arguments coming as fir.box can be tracked in an BoxValue.
     if (!dummyArg || !dummyArg.getType().isa<fir::BoxType>())
       return false;
-    // Non contiguous arrays must be tracked in an IrBox.
+    // Non contiguous arrays must be tracked in an BoxValue.
     if (sym.Rank() > 0 &&
         !sym.attrs().test(Fortran::semantics::Attr::CONTIGUOUS))
       return true;
@@ -2607,7 +2610,7 @@ private:
 
     if (isDummy) {
       auto dummyArg = lookupSymbol(sym).getAddr();
-      if (lowerToIrBox(sym, dummyArg)) {
+      if (lowerToBoxValue(sym, dummyArg)) {
         llvm::SmallVector<mlir::Value, 4> lbounds;
         llvm::SmallVector<mlir::Value, 4> extents;
         llvm::SmallVector<mlir::Value, 2> explicitParams;
@@ -2619,8 +2622,8 @@ private:
         // TODO: derived type length parameters.
         lowerExplicitLowerBounds(loc, sba, lbounds, stmtCtx);
         lowerExplicitExtents(loc, sba, lbounds, extents, stmtCtx);
-        localSymbols.addIrBoxSymbol(sym, dummyArg, lbounds, explicitParams,
-                                    extents, replace);
+        localSymbols.addBoxSymbol(sym, dummyArg, lbounds, explicitParams,
+                                  extents, replace);
         return;
       }
     }
