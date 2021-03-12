@@ -89,7 +89,7 @@ llvm::raw_ostream &fir::operator<<(llvm::raw_ostream &os,
 
 llvm::raw_ostream &fir::operator<<(llvm::raw_ostream &os,
                                    const fir::BoxValue &box) {
-  os << "box: { irbox: " << box.getAddr();
+  os << "box: { value: " << box.getAddr();
   if (box.lbounds.size()) {
     os << ", lbounds: [";
     llvm::interleaveComma(box.lbounds, os);
@@ -110,7 +110,7 @@ llvm::raw_ostream &fir::operator<<(llvm::raw_ostream &os,
 
 llvm::raw_ostream &fir::operator<<(llvm::raw_ostream &os,
                                    const fir::MutableBoxValue &box) {
-  os << "mutablebox: { irbox: " << box.getAddr();
+  os << "mutablebox: { addr: " << box.getAddr();
   if (!box.lenParams.empty()) {
     os << ", non deferred type params: [";
     llvm::interleaveComma(box.lenParams, os);
