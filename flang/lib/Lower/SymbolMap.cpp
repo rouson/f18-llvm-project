@@ -100,9 +100,9 @@ llvm::raw_ostream &fir::operator<<(llvm::raw_ostream &os,
     llvm::interleaveComma(box.explicitParams, os);
     os << "]";
   }
-  if (!box.explicitExtents.empty()) {
+  if (!box.extents.empty()) {
     os << ", explicit extents: [";
-    llvm::interleaveComma(box.explicitExtents, os);
+    llvm::interleaveComma(box.extents, os);
     os << "]";
   }
   return os << "}";
@@ -237,9 +237,9 @@ bool fir::BoxValue::verify() const {
   // Explicit extents are here to cover cases where an explicit-shape dummy
   // argument comes as a fir.box. This can only happen with derived types and
   // unlimited polymorphic.
-  if (!explicitExtents.empty() && !(isDerived() || isUnlimitedPolymorphic()))
+  if (!extents.empty() && !(isDerived() || isUnlimitedPolymorphic()))
     return false;
-  if (!explicitExtents.empty() && explicitExtents.size() != rank())
+  if (!extents.empty() && extents.size() != rank())
     return false;
   if (isCharacter() && explicitParams.size() > 1)
     return false;

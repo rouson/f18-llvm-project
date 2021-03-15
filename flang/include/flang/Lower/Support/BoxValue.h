@@ -181,9 +181,12 @@ protected:
 };
 
 /// Base class for values associated to a fir.box or fir.ref<fir.box>.
-class AbstractIrBox : public AbstractBox {
+class AbstractIrBox : public AbstractBox, public AbstractArrayBox {
 public:
   AbstractIrBox(mlir::Value addr) : AbstractBox{addr} {}
+  AbstractIrBox(mlir::Value addr, llvm::ArrayRef<mlir::Value> lbounds,
+                llvm::ArrayRef<mlir::Value> extents)
+      : AbstractBox{addr}, AbstractArrayBox(extents, lbounds) {}
   /// Get the fir.box<type> part of the address type.
   fir::BoxType getBoxTy() const {
     auto type = getAddr().getType();
@@ -214,8 +217,7 @@ public:
   /// Returns the rank of the entity. Beware that zero will be returned for
   /// both scalars and assumed rank.
   unsigned rank() const {
-    auto seqTy = getBaseTy().dyn_cast<fir::SequenceType>();
-    if (seqTy)
+    if (auto seqTy = getBaseTy().dyn_cast<fir::SequenceType>())
       return seqTy.getDimension();
     return 0;
   }
@@ -242,9 +244,8 @@ public:
   BoxValue(mlir::Value addr, llvm::ArrayRef<mlir::Value> lbounds,
            llvm::ArrayRef<mlir::Value> explicitParams,
            llvm::ArrayRef<mlir::Value> explicitExtents = {})
-      : AbstractIrBox{addr}, lbounds{lbounds.begin(), lbounds.end()},
-        explicitParams{explicitParams.begin(), explicitParams.end()},
-        explicitExtents{explicitExtents.begin(), explicitExtents.end()} {
+      : AbstractIrBox{addr, lbounds, explicitExtents},
+        explicitParams{explicitParams.begin(), explicitParams.end()} {
     assert(verify());
   }
   // TODO: check contiguous attribute of addr
@@ -254,9 +255,7 @@ public:
   LLVM_DUMP_METHOD void dump() const { llvm::errs() << *this; }
 
   llvm::ArrayRef<mlir::Value> getLBounds() const { return lbounds; }
-  llvm::ArrayRef<mlir::Value> getExplicitExtents() const {
-    return explicitExtents;
-  }
+  llvm::ArrayRef<mlir::Value> getExplicitExtents() const { return extents; }
   llvm::ArrayRef<mlir::Value> getExplicitParameters() const {
     return explicitParams;
   }
@@ -265,7 +264,7 @@ protected:
   // Verify constructor invariants.
   bool verify() const;
   // Always field when the BoxValue has lower bounds other than one.
-  llvm::SmallVector<mlir::Value, 4> lbounds;
+  // llvm::SmallVector<mlir::Value, 4> lbounds;
 
   // Only field when the BoxValue has explicit length parameters.
   // Otherwise, the length parameters are in the fir.box.
@@ -273,7 +272,7 @@ protected:
 
   // Only field with the explicit length parameters
   // Otherwise, the extents are in the fir.box.
-  llvm::SmallVector<mlir::Value, 4> explicitExtents;
+  // llvm::SmallVector<mlir::Value, 4> explicitExtents;
   // Note about explicitExtents: In general, explicit-shape will not come as
   // descriptors, so this field will be empty in most cases. The exception are
   // derived types with length parameters and polymorphic dummy argument arrays.
