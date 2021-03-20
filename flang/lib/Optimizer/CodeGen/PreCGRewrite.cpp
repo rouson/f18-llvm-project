@@ -258,10 +258,10 @@ public:
 
   void runOnOperation() override final {
     // Call runOn on all top level regions that may contain emboxOp/arrayCoorOp.
-    auto mod = getOperation();
-    for (auto func : mod.getOps<mlir::FuncOp>())
+    auto op = getOperation();
+    if (auto func = op->dyn_cast<mlir::FuncOp>())
       runOn(func, func.getBody());
-    for (auto global : mod.getOps<fir::GlobalOp>())
+    if (auto global = op->dyn_cast<fir::GlobalOp>())
       runOn(global, global.getRegion());
   }
 
