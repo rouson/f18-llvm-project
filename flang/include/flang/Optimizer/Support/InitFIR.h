@@ -21,6 +21,7 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/LocationSnapshot.h"
 #include "mlir/Transforms/Passes.h"
+#include "flang/Optimizer/CodeGen/CodeGen.h"
 
 namespace fir::support {
 
@@ -69,10 +70,10 @@ inline void registerMLIRPassesForFortranTools() {
   mlir::registerAffineDataCopyGenerationPass();
 
   mlir::registerConvertAffineToStandardPass();
-}
 
-/// Register the interfaces needed to lower to LLVM IR.
-void registerLLVMTranslation(mlir::MLIRContext &context);
+  // Flang passes
+  fir::registerOptCodeGenPasses();
+}
 
 } // namespace fir::support
 
