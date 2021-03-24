@@ -231,7 +231,8 @@ public:
 
 class CodeGenRewrite : public CodeGenRewriteBase<CodeGenRewrite> {
 public:
-  void runOn(mlir::Operation *op, mlir::Region &region) {
+  void runOnOperation() override final {
+    auto op = getOperation();
     auto &context = getContext();
     mlir::OpBuilder rewriter(&context);
     mlir::ConversionTarget target(context);
@@ -252,25 +253,6 @@ public:
                       "error in running the pre-codegen conversions");
       signalPassFailure();
     }
-    // Erase any residual.
-    simplifyRegion(region);
-  }
-
-  void runOnOperation() override final {
-    // Call runOn on all top level regions that may contain emboxOp/arrayCoorOp.
-    auto op = getOperation();
-    if (auto func = dyn_cast<mlir::FuncOp>(op))
-      runOn(func, func.getBody());
-    if (auto global = dyn_cast<fir::GlobalOp>(op))
-      runOn(global, global.getRegion());
-  }
-
-  // Clean up the region.
-  void simplifyRegion(mlir::Region &region) {
-    for (auto &block : region.getBlocks())
-      for (auto &op : block.getOperations())
-        for (auto &reg : op.getRegions())
-          simplifyRegion(reg);
   }
 };
 
