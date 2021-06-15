@@ -9,10 +9,15 @@
 #include "flang/Lower/HostAssociations.h"
 #include "SymbolMap.h"
 #include "flang/Lower/AbstractConverter.h"
+#include "flang/Lower/CharacterExpr.h"
 #include "flang/Lower/ConvertType.h"
 #include "flang/Lower/FIRBuilder.h"
 #include "flang/Lower/PFTBuilder.h"
 #include "flang/Lower/Todo.h"
+#include "flang/Optimizer/Support/FatalError.h"
+#include "llvm/Support/Debug.h"
+
+#define DEBUG_TYPE "flang-host-assoc"
 
 // `t` should be the result of getArgumentType, which has a type of
 // `!fir.ref<tuple<...>>`.
@@ -34,15 +39,58 @@ void Fortran::lower::HostAssociations::hostProcedureBindings(
   auto offTy = builder.getIntegerType(32);
 
   // Walk the list of symbols and update the pointers in the tuple.
-  for (auto s : llvm::enumerate(symbols)) {
-    auto box = symMap.lookupSymbol(s.value());
-    auto boxAddr = fir::getBase(box.toExtendedValue());
-    auto off = builder.createIntegerConstant(loc, offTy, s.index());
-    auto varTy = tupTy.getType(s.index());
+  auto offsetAndType =
+      [&](unsigned sidx) -> std::pair<mlir::Value, mlir::Type> {
+    auto off = builder.createIntegerConstant(loc, offTy, sidx);
+    auto varTy = tupTy.getType(sidx);
     auto refTy = builder.getRefType(varTy);
     auto eleOff = builder.create<fir::CoordinateOp>(loc, refTy, hostTuple, off);
-    auto castBox = builder.createConvert(loc, varTy, boxAddr);
-    builder.create<fir::StoreOp>(loc, castBox, eleOff);
+    return {eleOff, varTy};
+  };
+  for (auto s : llvm::enumerate(symbols)) {
+    auto box = symMap.lookupSymbol(s.value());
+    box.match(
+        [&](const Fortran::lower::SymbolBox::Intrinsic &v) {
+          auto [eleOff, varTy] = offsetAndType(s.index());
+          auto castBox = builder.createConvert(loc, varTy, v.getAddr());
+          builder.create<fir::StoreOp>(loc, castBox, eleOff);
+        },
+        [&](const Fortran::lower::SymbolBox::Char &v) {
+          // Create a boxchar.
+          auto boxchar = Fortran::lower::CharacterExprHelper(builder, loc)
+                             .createEmboxChar(v.getAddr(), v.getLen());
+          auto eleOff = offsetAndType(s.index()).first;
+          builder.create<fir::StoreOp>(loc, boxchar, eleOff);
+        },
+        [&](const Fortran::lower::SymbolBox::FullDim &v) {
+          // Create a box.
+          auto [eleOff, boxTy] = offsetAndType(s.index());
+          auto mbox = builder.create<fir::EmboxOp>(loc, boxTy, v.getAddr(),
+                                                   builder.consShape(loc, v));
+          builder.create<fir::StoreOp>(loc, mbox, eleOff);
+        },
+        [&](const Fortran::lower::SymbolBox::CharFullDim &v) {
+          // Create a box.
+          auto [eleOff, boxTy] = offsetAndType(s.index());
+          auto len = v.getLen();
+          auto mbox = builder.create<fir::EmboxOp>(
+              loc, boxTy, v.getAddr(), builder.consShape(loc, v),
+              /*slice=*/mlir::Value{}, mlir::ValueRange{len});
+          builder.create<fir::StoreOp>(loc, mbox, eleOff);
+        },
+        [&](const Fortran::lower::SymbolBox::PointerOrAllocatable &v) {
+          // Already boxed. so just use the box on hand.
+          auto eleOff = offsetAndType(s.index()).first;
+          builder.create<fir::StoreOp>(loc, v.getAddr(), eleOff);
+        },
+        [&](const Fortran::lower::SymbolBox::Box &v) {
+          // Already boxed, so just use the box on hand.
+          auto eleOff = offsetAndType(s.index()).first;
+          builder.create<fir::StoreOp>(loc, v.getAddr(), eleOff);
+        },
+        [&](const Fortran::lower::SymbolBox::None &) {
+          fir::emitFatalError(loc, "symbol not mapped");
+        });
   }
 
   converter.bindHostAssocTuple(hostTuple);
