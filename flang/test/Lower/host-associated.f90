@@ -1,7 +1,10 @@
 ! RUN: bbc %s -o - | FileCheck %s
 
+!!! Test scalar (with implicit none)
+
 ! CHECK: func @_QPtest1(
 subroutine test1
+  implicit none
   integer i
   ! CHECK-DAG: %[[i:.*]] = fir.alloca i32 {{.*}}uniq_name = "_QFtest1Ei"
   ! CHECK-DAG: %[[tup:.*]] = fir.alloca tuple<!fir.ptr<i32>>
@@ -18,9 +21,12 @@ contains
   ! CHECK: %[[val:.*]] = fir.call @_QPifoo() : () -> i32
   ! CHECK: fir.store %[[val]] to %[[i]] : !fir.ptr<i32>
   subroutine test1_internal
+    integer, external :: ifoo
     i = ifoo()
   end subroutine test1_internal
 end subroutine test1
+
+!!! Test scalar
 
 ! CHECK: func @_QPtest2() {
 subroutine test2
@@ -65,3 +71,94 @@ contains
     end if
   end subroutine test2_inner
 end subroutine test2
+
+!!! Test array
+
+! CHECK: func @_QPtest3(
+subroutine test3(p,q)
+  real :: p(:)
+  real :: q(:)
+
+  q = -42.0
+  ! CHECK: fir.call @_QFtest3Ptest3_inner() : () -> ()
+  call test3_inner
+
+  if (p(1) .ne. -42.0) then
+     print *, "failed"
+  end if
+  
+contains
+  ! CHECK: func @_QFtest3Ptest3_inner(
+  subroutine test3_inner
+    ! FIXME: fails at a TODO
+    !p = q
+  end subroutine test3_inner
+end subroutine test3
+
+!!! Test scalar allocatable
+
+! CHECK: func @_QPtest4() {
+subroutine test4
+  real, pointer :: p
+  real, allocatable, target :: ally
+
+  allocate(ally)
+  ally = -42.0
+  ! CHECK: fir.call @_QFtest4Ptest4_inner() : () -> ()
+  call test4_inner
+
+  if (p .ne. -42.0) then
+     print *, "failed"
+  end if
+  
+contains
+  ! CHECK: func @_QFtest4Ptest4_inner(
+  subroutine test4_inner
+    ! FIXME: fails at a TODO
+    !p => ally
+  end subroutine test4_inner
+end subroutine test4
+
+!!! Test allocatable array
+
+! CHECK: func @_QPtest5() {
+subroutine test5
+  real, pointer :: p(:)
+  real, allocatable, target :: ally(:)
+
+  allocate(ally(10))
+  ally = -42.0
+  ! CHECK: fir.call @_QFtest5Ptest5_inner() : () -> ()
+  call test5_inner
+
+  if (p(1) .ne. -42.0) then
+     print *, "failed"
+  end if
+  
+contains
+  ! CHECK: func @_QFtest5Ptest5_inner(
+  subroutine test5_inner
+    ! FIXME: fails at a TODO
+    !p => ally
+  end subroutine test5_inner
+end subroutine test5
+
+!!! Test CHARACTER type
+
+! CHECK: func @_QPtest6(
+subroutine test6(p)
+  character(*) :: p
+  character(40) :: ch
+
+  ch = "Hi there"
+  ! CHECK: fir.call @_QFtest6Ptest6_inner() : () -> ()
+  call test6_inner
+  print *, p
+  
+contains
+  ! CHECK: func @_QFtest6Ptest6_inner(
+  subroutine test6_inner
+    ! FIXME: fails at a TODO
+    !p = ch
+  end subroutine test6_inner
+end subroutine test6
