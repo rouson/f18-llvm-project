@@ -95,6 +95,27 @@ contains
   end subroutine test3_inner
 end subroutine test3
 
+! CHECK: func @_QPtest3a(
+subroutine test3a(p)
+  real :: p(10)
+  real :: q(10)
+
+  q = -42.0
+  ! CHECK: fir.call @_QFtest3aPtest3a_inner() : () -> ()
+  call test3a_inner
+
+  if (p(1) .ne. -42.0) then
+     print *, "failed"
+  end if
+  
+contains
+  ! CHECK: func @_QFtest3aPtest3a_inner(
+  subroutine test3a_inner
+    ! FIXME: fails at a TODO
+    !p = q
+  end subroutine test3a_inner
+end subroutine test3a
+
 !!! Test scalar allocatable
 
 ! CHECK: func @_QPtest4() {
