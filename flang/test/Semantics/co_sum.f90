@@ -1,6 +1,6 @@
 ! RUN: %S/test_errors.sh %s %t %flang_fc1
 ! REQUIRES: shell
-! Check for semantic errors in num_images() function calls
+! Check for semantic errors in co_sum() subroutine calls
 
 subroutine test
 
